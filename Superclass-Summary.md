@@ -31,6 +31,8 @@ def get_word_RSM(class_index1, class_index2):
 **结果**：
 - 成功构建了基于语义的类别层级结构
 - 相似性矩阵显示出明显的块状结构（见可视化图）
+<img width="436" height="410" alt="image" src="https://github.com/user-attachments/assets/545ce8aa-7267-4acc-b2a2-7657dfad7139" />
+
 
 ### 1.2 基于BERT的词嵌入层级
 
