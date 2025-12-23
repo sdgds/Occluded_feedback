@@ -146,6 +146,8 @@ Top-Down:          67.19%
 - 净损失：-4,477个样本
 
 ### 3.2 尝试2：置信度门控策略
+<img width="1589" height="1189" alt="image" src="https://github.com/user-attachments/assets/49e178fa-dd30-485b-b194-caf8c28c3294" />
+
 
 **改进思路**：
 只在AlexNet低置信度时使用top-down，高置信度时保持原预测。
