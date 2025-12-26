@@ -181,6 +181,8 @@ $$\text{Cov}(\mathbf{r}_{cat}, \mathbf{r}_{id}) \approx 0$$
 高维神经群体常具有**模块化子空间结构**，不同任务/特征变量占据不同子空间，可并存而不互斥。
 
 ---
+![Uploading image.png…]()
+
 
 ## 3. 假设1：Sst主导的结构性筛选/树突门控
 
