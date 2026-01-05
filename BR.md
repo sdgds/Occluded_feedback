@@ -12,12 +12,14 @@
 
 在随机Hopfield神经网络中，神经元的激活概率由以下sigmoid函数决定：
 
-$$P(s_i = +1 \mid h_i) = \frac{1}{1 + e^{-\beta \cdot h_i}}$$
+```
+P(s_i = +1 | h_i) = 1 / (1 + exp(-β · h_i))
+```
 
 其中：
-- $s_i$：第i个神经元的状态（+1或-1）
-- $h_i$：局部场强（来自其他神经元的输入）
-- $\beta$：**逆温度参数**（inverse temperature），控制系统的确定性
+- `s_i`：第i个神经元的状态（+1或-1）
+- `h_i`：局部场强（来自其他神经元的输入）
+- `β`：**逆温度参数**（inverse temperature），控制系统的确定性
 
 ### 2.2 β参数的物理意义
 
@@ -29,8 +31,8 @@ $$P(s_i = +1 \mid h_i) = \frac{1}{1 + e^{-\beta \cdot h_i}}$$
 ### 2.3 竞争机制
 
 Face和Place两个区域通过**反相调节各自的β值**实现对抗性竞争：
-- 当Face主导时：$\beta_{Face} \approx 15$（高），$\beta_{Place} \approx 2$（低）
-- 当Place主导时：$\beta_{Place} \approx 15$（高），$\beta_{Face} \approx 2$（低）
+- 当Face主导时：`β_Face ≈ 15`（高），`β_Place ≈ 2`（低）
+- 当Place主导时：`β_Place ≈ 15`（高），`β_Face ≈ 2`（低）
 
 ---
 
@@ -66,14 +68,22 @@ def changed_beta_func(self, region_avg_dynamics_state, mask, beta, tao, adaptati
 
 ### 4.1 总体架构
 
-```mermaid
-graph TD
-    A[输入: region_avg_dynamics_state, mask] --> B[计算统计量: r, r_1]
-    B --> C{判断系统状态}
-    C -->|稳态| D[beta_r 策略]
-    C -->|过渡态| E[beta_first_order_difference 策略]
-    D --> F[返回 β 值]
-    E --> F
+```
+输入: region_avg_dynamics_state, mask
+    ↓
+计算统计量: r (平均激活率), r_1 (一阶差分)
+    ↓
+判断系统状态 (|r_1| < threshold ?)
+    ↓
+├─ 稳态 → beta_r 策略
+│          ├─ 高激活 → 神经适应 (增加β)
+│          └─ 低激活 → 对手抑制 (根据opponent决定β)
+│
+└─ 过渡态 → beta_first_order_difference 策略
+           ├─ 上升 → 施加制动 (高β)
+           └─ 下降 → 加速切换 (低β)
+    ↓
+返回 β 值
 ```
 
 ---
@@ -82,7 +92,10 @@ graph TD
 
 #### 4.2.1 平均激活率 r
 
-$$r = \frac{1}{\tau} \sum_{i=1}^{\tau} \text{firing\_rate}(t-i)$$
+**数学公式：**
+```
+r = (1/τ) · Σ[i=1 to τ] firing_rate(t-i)
+```
 
 **代码实现：**
 ```python
@@ -94,14 +107,17 @@ r = np.mean(r)  # 过去τ个时间步的平均激活
 
 **物理意义：**
 - 衡量该区域当前是否处于高激活状态（主导感知）
-- $r > 0.78$：该区域主导感知（例如正在"看到"Face）
-- $r < 0.78$：该区域被抑制（例如正在"看到"Place）
+- `r > 0.78`：该区域主导感知（例如正在"看到"Face）
+- `r < 0.78`：该区域被抑制（例如正在"看到"Place）
 
 ---
 
 #### 4.2.2 一阶时间差分 r₁
 
-$$r_1 = \frac{1}{\tau} \sum_{i=1}^{\tau} \left[ \text{firing\_rate}(t-i) - \text{firing\_rate}(t-i-1) \right]$$
+**数学公式：**
+```
+r_1 = (1/τ) · Σ[i=1 to τ] [firing_rate(t-i) - firing_rate(t-i-1)]
+```
 
 **代码实现：**
 ```python
@@ -113,9 +129,9 @@ r_1 = np.mean(r_1)  # 平均变化速率
 
 **物理意义：**
 - 检测该区域激活是否正在快速变化
-- $r_1 > 0.03$：激活正在上升（正在获得主导）
-- $r_1 < -0.03$：激活正在下降（正在失去主导）
-- $|r_1| < 0.03$：激活稳定（处于稳态）
+- `r_1 > 0.03`：激活正在上升（正在获得主导）
+- `r_1 < -0.03`：激活正在下降（正在失去主导）
+- `|r_1| < 0.03`：激活稳定（处于稳态）
 
 ---
 
@@ -134,22 +150,27 @@ else:
 
 | 条件 | 策略 | 物理意义 |
 |------|------|---------|
-| $\|r_1\| < 0.03 \pm 0.018$ | `beta_r(r)` | 系统稳定，基于激活率调节 |
-| $\|r_1\| \geq 0.03 \pm 0.018$ | `beta_first_order_difference(r_1)` | 系统过渡，基于变化率调节 |
+| `|r_1| < 0.03 ± 0.018` | `beta_r(r)` | 系统稳定，基于激活率调节 |
+| `|r_1| ≥ 0.03 ± 0.018` | `beta_first_order_difference(r_1)` | 系统过渡，基于变化率调节 |
 
 ---
 
 ## 5. 策略1：稳态调节 (beta_r)
 
-当系统处于稳态时（$|r_1| < 0.03$），使用激活率驱动的β调节。
+当系统处于稳态时（`|r_1| < 0.03`），使用激活率驱动的β调节。
 
 ### 5.1 分支A：高激活自适应（Neural Adaptation）
 
 **触发条件：**
-$$r > 0.78 + \mathcal{N}(0, 0.09)$$
+```
+r > 0.78 + N(0, 0.09)
+```
+其中 `N(μ, σ)` 表示均值为μ、标准差为σ的正态分布。
 
 **计算公式：**
-$$\beta(r) = \frac{15 - 2}{1 + e^{25(r - 0.5)}} + 2 + \mathcal{N}(0, 1.1)$$
+```
+β(r) = [(15 - 2) / (1 + exp(25·(r - 0.5)))] + 2 + N(0, 1.1)
+```
 
 **代码实现：**
 ```python
@@ -178,7 +199,9 @@ if r > adaptation_threshold:
 ### 5.2 分支B：对手抑制机制（Opponent Inhibition）
 
 **触发条件：**
-$$r \leq 0.78 + \mathcal{N}(0, 0.09)$$
+```
+r ≤ 0.78 + N(0, 0.09)
+```
 
 #### 5.2.1 计算对手区域激活
 
@@ -201,7 +224,9 @@ opponent_r = np.mean(opponent_r)
 ```
 
 **数学表达：**
-$$r_{\text{opponent}} = \frac{1}{\tau} \sum_{i=1}^{\tau} \text{firing\_rate}_{\text{opponent}}(t-i)$$
+```
+r_opponent = (1/τ) · Σ[i=1 to τ] firing_rate_opponent(t-i)
+```
 
 ---
 
@@ -220,13 +245,13 @@ else:
 
 **数学表达：**
 
-$$
-\beta_{\text{current}} =
-\begin{cases}
-15 + \mathcal{N}(0, 1.6) & \text{if } r_{\text{opponent}} < 0.8 + \mathcal{U}(-0.1, 0.05) \\
-2 + \mathcal{N}(0, 0.9) & \text{otherwise}
-\end{cases}
-$$
+```
+β_current = {
+    15 + N(0, 1.6)  if r_opponent < 0.8 + U(-0.1, 0.05)
+    2 + N(0, 0.9)   otherwise
+}
+```
+其中 `U(a, b)` 表示均匀分布在 [a, b] 区间。
 
 **物理意义分析：**
 
@@ -245,7 +270,7 @@ $$
 
 ## 6. 策略2：过渡态调节 (beta_first_order_difference)
 
-当系统处于快速变化状态时（$|r_1| > 0.03$）。
+当系统处于快速变化状态时（`|r_1| > 0.03`）。
 
 ```python
 def beta_first_order_difference(r_1):
@@ -275,9 +300,9 @@ def beta_first_order_difference(r_1):
 
 | 参数名 | 均值 | 噪声分布 | 物理意义 | 调优方向 |
 |--------|------|---------|---------|---------|
-| `adaptation_threshold` | 0.78 | $\mathcal{N}(0, 0.09)$ | 触发神经适应的激活阈值 | ↑增大：延迟适应发生 |
-| **`opponent_threshold`** | 0.8 | $\mathcal{U}(-0.1, 0.05)$ | **触发感知切换的对手激活阈值** | ↓降低：更易发生切换 |
-| `decision_threshold` | 0.03 | $\mathcal{N}(0, 0.018)$ | 判断稳态/过渡态的边界 | ↑增大：更多稳态判断 |
+| `adaptation_threshold` | 0.78 | N(0, 0.09) | 触发神经适应的激活阈值 | ↑增大：延迟适应发生 |
+| **`opponent_threshold`** | 0.8 | **U(-0.1, 0.05)** | **触发感知切换的对手激活阈值** | ↓降低：更易发生切换 |
+| `decision_threshold` | 0.03 | N(0, 0.018) | 判断稳态/过渡态的边界 | ↑增大：更多稳态判断 |
 
 ---
 
@@ -296,19 +321,21 @@ def beta_first_order_difference(r_1):
 ### 7.3 Sigmoid函数参数
 
 **完整表达式：**
-$$\beta(r) = \frac{\beta_{\max} - \beta_{\min}}{1 + e^{k(r - r_0)}} + \beta_{\min} + \epsilon$$
+```
+β(r) = (β_max - β_min) / (1 + exp(k·(r - r_0))) + β_min + ε
+```
 
 | 参数符号 | 代码中的值 | 物理意义 |
 |---------|-----------|---------|
-| $\beta_{\max}$ | 15 | β的最大值（最小增益） |
-| $\beta_{\min}$ | 2 (`adaptation_lower_bound`) | β的最小值（最大增益） |
-| $k$ | 25 | Sigmoid斜率（控制陡峭程度） |
-| $r_0$ | 0.5 | Sigmoid中心点 |
-| $\epsilon$ | $\mathcal{N}(0, 1.1)$ | 输出噪声 |
+| β_max | 15 | β的最大值（最小增益） |
+| β_min | 2 (`adaptation_lower_bound`) | β的最小值（最大增益） |
+| k | 25 | Sigmoid斜率（控制陡峭程度） |
+| r_0 | 0.5 | Sigmoid中心点 |
+| ε | N(0, 1.1) | 输出噪声 |
 
 **斜率演化：**
-- 原始版本：$k = 100$ → 几乎阶跃函数（过于确定）
-- 当前版本：$k = 25$ → 平滑过渡（允许渐进式适应）
+- 原始版本：`k = 100` → 几乎阶跃函数（过于确定）
+- 当前版本：`k = 25` → 平滑过渡（允许渐进式适应）
 
 ---
 
@@ -328,14 +355,14 @@ $$\beta(r) = \frac{\beta_{\max} - \beta_{\min}}{1 + e^{k(r - r_0)}} + \beta_{\mi
 ### 8.2 关键时刻详解（t=20）
 
 **Face区域的计算：**
-1. Face的 $r = 0.75 < 0.78$ → 进入"对手抑制"分支
-2. 查询Place的激活：$r_{\text{opponent}} = 0.78$
-3. 生成随机阈值：$\text{threshold} = 0.8 + \mathcal{U}(-0.1, 0.05) = 0.72$（假设）
-4. 判断：$0.78 > 0.72$ → Face获得 $\beta = 2$（准备让出主导）
+1. Face的 `r = 0.75 < 0.78` → 进入"对手抑制"分支
+2. 查询Place的激活：`r_opponent = 0.78`
+3. 生成随机阈值：`threshold = 0.8 + U(-0.1, 0.05) = 0.72`（假设）
+4. 判断：`0.78 > 0.72` → Face获得 `β = 2`（准备让出主导）
 
 **Place区域的计算：**
-1. Place的 $r = 0.78 > 0.78$ → 触发自适应分支
-2. Place获得 $\beta \approx 12$（适度抑制，但仍在主导）
+1. Place的 `r = 0.78 > 0.78` → 触发自适应分支
+2. Place获得 `β ≈ 12`（适度抑制，但仍在主导）
 
 **系统行为：**
 - Face获得低β → 降低噪声，提高对竞争的敏感性
@@ -375,21 +402,25 @@ $$\beta(r) = \frac{\beta_{\max} - \beta_{\min}}{1 + e^{k(r - r_0)}} + \beta_{\mi
 
 **数学原理：**
 
-假设感知状态的切换由泊松过程驱动，但切换率 $\lambda$ 本身是随机的：
+假设感知状态的切换由泊松过程驱动，但切换率 λ 本身是随机的：
 
-$$\lambda(t) = \lambda_0 \cdot f(r(t), r_{\text{opponent}}(t), \text{noise})$$
+```
+λ(t) = λ_0 · f(r(t), r_opponent(t), noise)
+```
 
 当切换率具有随机性时，等待时间分布从**指数分布**演化为**Gamma分布**：
 
-$$P(T = t) = \frac{\lambda^k}{\Gamma(k)} t^{k-1} e^{-\lambda t}$$
+```
+P(T = t) = (λ^k / Γ(k)) · t^(k-1) · exp(-λ·t)
+```
 
 其中：
-- $k$：形状参数（与噪声强度相关）
-- $\lambda$：尺度参数（与平均切换率相关）
-- $\Gamma(k)$：Gamma函数
+- `k`：形状参数（与噪声强度相关）
+- `λ`：尺度参数（与平均切换率相关）
+- `Γ(k)`：Gamma函数
 
 **关键因素：**
-- `opponent_threshold` 的大范围随机性 → 控制 $k$ 参数
+- `opponent_threshold` 的大范围随机性 → 控制 k 参数
 - 神经适应机制 → 引入记忆效应，增强Gamma特性
 
 ---
