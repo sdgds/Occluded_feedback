@@ -117,55 +117,19 @@ No additional download is required for the bundled demo below. This release alre
 
 ## Demo
 
-### Recommended demo for editors and reviewers
+The demo and analysis code are contained in the three notebooks below:
 
-The fastest way to verify the release is to run the analysis notebook on the bundled precomputed results.
+- `Stimuli_formal.ipynb`
+- `Occluded_face_formal.ipynb`
+- `Model_results_formal.ipynb`
 
-From the `Formal/` directory:
-
-```bash
-conda activate occluded_face
-jupyter nbconvert --to notebook --execute --inplace Model_results_formal.ipynb
-```
-
-This demo uses the provided result files in `model_results/` and does not require rerunning the full stochastic simulation.
-
-### Expected demo output
-
-Running `Model_results_formal.ipynb` should produce:
-
-- printed statistics for manifold dimensionality and manifold radius of vlPFC and VTC
-- a bar plot of normalized face-vs-tool decoding scores across the five occlusion conditions
-- a time-series plot showing how the VTC face-selective response evolves over model time under different occlusion levels
-
-The bundled result files loaded by the notebook have the following structure:
-
-- `Dynamic_states_VTC`: shape `(20, 162, 200, 200)` for face-like conditions
-- `Dynamic_states_vlPFC`: shape `(20, 30, 20, 20)`
-- `H_top_down`: shape `(20, 299, 200, 200)`
-
-Qualitatively, the expected result is consistent with the paper:
-
-- intact faces show the strongest and fastest face-like VTC response
-- more severely occluded faces show delayed or weaker trajectories
-- the feedback model still preserves face-related information across occlusion levels better than a purely feedforward account
+The expected outputs are shown directly in the corresponding notebook cells.
 
 ### Expected demo run time
 
 Expected run time on an ordinary desktop computer with `32 GB` RAM and an SSD: `~10-20 minutes`.
 
 Most of this time is spent loading the bundled `model_results/` files, which occupy about `13 GB` in total.
-
-### Optional full rerun from the bundled stimuli
-
-If you want to rerun the hierarchical model itself instead of the precomputed demo:
-
-```bash
-conda activate occluded_face
-jupyter nbconvert --to notebook --execute --inplace Occluded_face_formal.ipynb
-```
-
-This full rerun is substantially heavier than the recommended demo because it loads `model_VTC_weights.npy` (`~11.9 GB`) and performs long stochastic updates for each stimulus. On a CPU desktop, this should be treated as a long job rather than a quick verification step.
 
 ## Instructions for Use
 
@@ -221,14 +185,6 @@ images_response, Dynamic_states_VTC, Dynamic_states_vlPFC, F_all, H_top_down_all
    - `Dynamic_states_vlPFC`
    - `F`
    - `H_top_down`
-
-### If you want to compare your own condition against tools
-
-The decoding analysis in `Model_results_formal.ipynb` is face-vs-tool based. Therefore, if you want to reproduce the same type of decoding on your own data, you should also prepare a non-face comparison folder analogous to `Stim_for_model/tools/` and generate a matching `Tool_feedback_results.npy`.
-
-### Important note about `Stimuli_formal.ipynb`
-
-`Stimuli_formal.ipynb` is used for the Grad-CAM based face-information analysis described in the manuscript. In the current release, the notebook is configured to train a simple local face-vs-tool classifier head from the bundled `Stim_for_model/face/` and `Stim_for_model/tools/` images before running Grad-CAM, so no extra external checkpoint is required.
 
 ## Repository Contents
 
